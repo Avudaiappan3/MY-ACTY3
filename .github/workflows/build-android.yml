@@ -1,3 +1,4 @@
+
 name: Build Android APK
 
 on:
@@ -10,50 +11,50 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout code
+      # Checkout repository
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      # Step 2: Setup Node.js
+      # Setup Node.js
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: 22
+          cache: npm
 
-      # Step 3: Install dependencies
+      # Install dependencies
       - name: Install Dependencies
         run: npm install
 
-      # Step 4: Setup Java
+      # Setup Java
       - name: Setup Java JDK
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
+          distribution: temurin
+          java-version: 17
 
-      # Step 5: Setup Android SDK
+      # Setup Android SDK
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v2
+        uses: android-actions/setup-android@v3
 
-      # Step 6: Install Android SDK components
+      # Install Android SDK Components
       - name: Install Android SDK Components
         run: |
           sdkmanager "platform-tools"
-          sdkmanager "platforms;android-33"
-          sdkmanager "build-tools;33.0.0"
+          sdkmanager "platforms;android-35"
+          sdkmanager "build-tools;35.0.0"
 
-      # Step 7: Create local.properties
+      # Create local.properties
       - name: Create local.properties
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
 
-      # Step 8: Decode keystore from secret
+      # Decode Keystore
       - name: Decode Keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/my-upload-key.keystore
 
-      # Step 9: Create gradle.properties with signing config
+      # Configure Signing
       - name: Setup Gradle Properties
         run: |
           echo "MYAPP_UPLOAD_STORE_FILE=my-upload-key.keystore" >> android/gradle.properties
@@ -61,17 +62,17 @@ jobs:
           echo "MYAPP_UPLOAD_STORE_PASSWORD=${{ secrets.STORE_PASSWORD }}" >> android/gradle.properties
           echo "MYAPP_UPLOAD_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> android/gradle.properties
 
-      # Step 10: Make gradlew executable
+      # Make gradlew executable
       - name: Make Gradlew Executable
         run: chmod +x android/gradlew
 
-      # Step 11: Build Release APK
+      # Build APK
       - name: Build Release APK
         run: |
           cd android
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleRelease --stacktrace --no-daemon
 
-      # Step 12: Upload APK as artifact
+      # Upload APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
@@ -79,30 +80,14 @@ jobs:
           path: android/app/build/outputs/apk/release/app-release.apk
           retention-days: 30
 
-      # Step 13: Create Release with APK download link
+      # Create GitHub Release
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
           tag_name: v${{ github.run_number }}
           name: Your Activities v${{ github.run_number }}
-          body: |
-            ## ✨ Your Activities App
-            
-            ### 📥 Download APK
-            Download the APK file below and install on your Android phone!
-            
-            ### 📱 Installation
-            1. Download app-release.apk
-            2. Open on your phone
-            3. Allow unknown sources
-            4. Install and enjoy!
-            
-            ### 🎙️ Features
-            - Voice automation (Tamil + English)
-            - Google Sheets sync
-            - Midnight Neon design
-            - 25+ habit tracking fields
           files: android/app/build/outputs/apk/release/app-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
