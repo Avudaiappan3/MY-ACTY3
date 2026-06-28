@@ -3,6 +3,7 @@ apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
 react {
+    autolinkLibrariesWithApp()
 }
 
 android {
@@ -44,6 +45,10 @@ android {
             minifyEnabled false
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
+    }
+
+    packagingOptions {
+        exclude "**/libc++_shared.so"
     }
 }
 
