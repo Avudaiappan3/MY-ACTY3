@@ -25,7 +25,8 @@
     },
     "plugins": [
       "expo-av",
-      "expo-notifications"
+      "expo-notifications",
+      "expo-speech-recognition"
     ],
     "extra": {
       "eas": {
