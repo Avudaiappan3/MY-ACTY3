@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "Voice Expense Tracker",
+    "slug": "voice-expense-tracker",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#0A0A1A"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0A0A1A"
+      },
+      "permissions": [
+        "RECORD_AUDIO",
+        "VIBRATE",
+        "RECEIVE_BOOT_COMPLETED",
+        "POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ],
+      "package": "com.avudaiappan.voiceexpensetracker"
+    },
+    "plugins": [
+      "expo-av",
+      "expo-notifications"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "96cc05cd-f23f-459a-acf1-966fce8bba7a"
+      }
+    }
+  }
+}
