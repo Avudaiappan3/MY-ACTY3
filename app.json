@@ -19,12 +19,6 @@
         "RECEIVE_BOOT_COMPLETED",
         "POST_NOTIFICATIONS",
         "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS",
-        "RECORD_AUDIO",
-        "VIBRATE",
-        "RECEIVE_BOOT_COMPLETED",
-        "POST_NOTIFICATIONS",
-        "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
       "package": "com.avudaiappan.voiceexpensetracker"
@@ -32,23 +26,17 @@
     "plugins": [
       "expo-av",
       "expo-notifications",
-      "expo-speech-recognition"
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow microphone access for voice expenses",
+          "speechRecognitionPermission": "Allow speech recognition for voice expenses"
+        }
+      ]
     ],
     "extra": {
       "eas": {
-        "projectId": "96cc05cd-f23f-459a-acf1-966fce8bba7a"
-      }
-    },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/96cc05cd-f23f-459a-acf1-966fce8bba7a"
-    },
-    "ios": {
-      "infoPlist": {
-        "NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to use speech recognition.",
-        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use the microphone."
+        "projectId": "96cc05cd-f231-459a-acf1-966fce8bba7a"
       }
     }
   }
