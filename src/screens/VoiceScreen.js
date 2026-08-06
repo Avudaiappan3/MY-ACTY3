@@ -1,12 +1,15 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Animated,
-  ScrollView, TextInput, Alert, Vibration,
+  ScrollView, TextInput, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Audio } from 'expo-av';
 import * as Speech from 'expo-speech';
 import * as Haptics from 'expo-haptics';
+import {
+  ExpoSpeechRecognitionModule,
+  useSpeechRecognitionEvent,
+} from 'expo-speech-recognition';
 import { COLORS, SPACING, RADIUS, CATEGORIES, PAYMENT_METHODS } from '../theme';
 import { parseExpense } from '../services/parser';
 import { saveExpense, getSettings } from '../services/storage';
@@ -73,7 +76,6 @@ function MicButton({ isListening, onPress }) {
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
-      {/* Ripple ring */}
       {isListening && (
         <Animated.View style={[styles.ring, {
           transform: [{ scale: ring }],
@@ -197,58 +199,61 @@ export default function VoiceScreen() {
   const [editNote,     setEditNote]     = useState('');
   const [savedAnim,    setSavedAnim]    = useState(false);
   const [settings,     setSettings]     = useState({});
-  const recordingRef = useRef(null);
+  const [textInput,    setTextInput]    = useState('');
 
   useEffect(() => {
     getSettings().then(setSettings);
-    Audio.requestPermissionsAsync();
+    // Request mic permission
+    ExpoSpeechRecognitionModule.requestPermissionsAsync();
   }, []);
 
-  // ── Start/stop recording ──────────────────────────────────────────────────
+  // ── Speech recognition events ─────────────────────────────────────────────
+  useSpeechRecognitionEvent('start', () => {
+    setIsListening(true);
+    setStatus('🎙️ Listening... speak now');
+  });
+
+  useSpeechRecognitionEvent('end', () => {
+    setIsListening(false);
+  });
+
+  useSpeechRecognitionEvent('result', (event) => {
+    const text = event.results[0]?.transcript || '';
+    if (text) {
+      setTranscript(text);
+      setStatus('🤖 Processing...');
+      processText(text);
+    }
+  });
+
+  useSpeechRecognitionEvent('error', (event) => {
+    setIsListening(false);
+    setStatus('❌ Could not hear — try again or type below');
+  });
+
+  // ── Start/stop listening ──────────────────────────────────────────────────
   const toggleListen = async () => {
     if (isListening) {
-      await stopListening();
+      ExpoSpeechRecognitionModule.stop();
+      setIsListening(false);
     } else {
-      await startListening();
-    }
-  };
-
-  const startListening = async () => {
-    try {
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
-      recordingRef.current = recording;
-      setIsListening(true);
-      setStatus('🎙️ Listening... speak now');
-      setTranscript('');
       setParsed(null);
-      if (settings.haptics !== false) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch (e) {
-      setStatus('❌ Mic error — use text input below');
+      setTranscript('');
+      setStatus('🎙️ Starting...');
+      ExpoSpeechRecognitionModule.start({
+        lang: 'en-IN',
+        interimResults: true,
+        maxAlternatives: 1,
+      });
+      if (settings.haptics !== false) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
     }
   };
 
-  const stopListening = async () => {
-    setIsListening(false);
-    setStatus('🤖 Processing...');
-    try {
-      await recordingRef.current?.stopAndUnloadAsync();
-      const uri = recordingRef.current?.getURI();
-      // In production: send URI to Whisper API endpoint
-      // For now: simulate with text input (Expo Go limitation)
-      setStatus('✏️ Type your expense below (Whisper processes on device)');
-      if (settings.haptics !== false) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (e) {
-      setStatus('Type your expense below');
-    }
-  };
-
-  // ── Process text input ────────────────────────────────────────────────────
+  // ── Process text ──────────────────────────────────────────────────────────
   const processText = (text) => {
     if (!text.trim()) return;
-    setTranscript(text);
     const result = parseExpense(text);
     if (result) {
       setParsed(result);
@@ -257,9 +262,11 @@ export default function VoiceScreen() {
       setEditCat(result.category);
       setEditPay(result.payment);
       setEditNote(result.note || '');
-      if (settings.haptics !== false) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (settings.haptics !== false) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
     } else {
-      setStatus('❌ Could not detect. Try: "food 50" or "transport 30 upi"');
+      setStatus('❌ Not detected. Try: "food 50" or "transport 30 upi"');
     }
   };
 
@@ -293,17 +300,19 @@ export default function VoiceScreen() {
       setSavedAnim(false);
       setParsed(null);
       setTranscript('');
+      setTextInput('');
       setEditMode(false);
       setStatus('Tap mic to speak');
     }, 2000);
 
-    if (settings.haptics !== false) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (settings.haptics !== false) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
   };
 
   return (
     <LinearGradient colors={[COLORS.bg, '#050510']} style={styles.root}>
       <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled">
-        {/* Title */}
         <Text style={styles.title}>Voice Expense</Text>
         <Text style={styles.subtitle}>Speak or type your expense</Text>
 
@@ -393,7 +402,12 @@ export default function VoiceScreen() {
                 style={[styles.editInput, { flex: 1, marginBottom: 0 }]}
                 placeholder='e.g. "food 50 upi" or "transport 30"'
                 placeholderTextColor={COLORS.textMuted}
-                onSubmitEditing={e => processText(e.nativeEvent.text)}
+                value={textInput}
+                onChangeText={setTextInput}
+                onSubmitEditing={() => {
+                  processText(textInput);
+                  setTranscript(textInput);
+                }}
                 returnKeyType="done"
               />
             </View>
@@ -436,32 +450,26 @@ const styles = StyleSheet.create({
   title:        { fontSize: 28, fontWeight: '900', color: COLORS.text,
                   marginTop: 56, marginBottom: 4 },
   subtitle:     { fontSize: 14, color: COLORS.textSub, marginBottom: SPACING.lg },
-
   waveContainer:{ height: 80, justifyContent:'center', marginBottom: SPACING.md },
   waveform:     { flexDirection:'row', alignItems:'center', justifyContent:'center',
                   height: 60, gap: 3 },
   waveBar:      { width: 4, height: 50, borderRadius: 2 },
-
   micContainer: { alignItems:'center', marginVertical: SPACING.lg },
   ring:         { position:'absolute', width: 120, height: 120, borderRadius: 60,
                   borderWidth: 2, borderColor: COLORS.pink, top: -8, left: -8 },
   micBtn:       { width: 104, height: 104, borderRadius: 52, alignItems:'center',
                   justifyContent:'center', elevation: 12 },
   micEmoji:     { fontSize: 40 },
-
   status:       { textAlign:'center', fontSize: 15, color: COLORS.textSub,
                   marginBottom: SPACING.md },
-
   savedBanner:  { backgroundColor: COLORS.green + '22', borderRadius: RADIUS.md,
                   padding: SPACING.md, alignItems:'center', marginBottom: SPACING.md,
                   borderWidth: 1, borderColor: COLORS.green },
   savedText:    { color: COLORS.green, fontSize: 18, fontWeight: '800' },
-
   transcriptBox:{ backgroundColor: COLORS.surfaceHigh, borderRadius: RADIUS.md,
                   padding: SPACING.md, marginBottom: SPACING.md },
   transcriptLabel:{ fontSize: 10, color: COLORS.textMuted, letterSpacing: 1.5 },
   transcriptText: { fontSize: 16, color: COLORS.cyan, fontStyle:'italic', marginTop: 4 },
-
   confirmCard:  { backgroundColor: COLORS.surface, borderRadius: RADIUS.lg,
                   borderWidth: 1, padding: SPACING.md, marginBottom: SPACING.md },
   confirmTitle: { fontSize: 12, color: COLORS.textSub, letterSpacing: 1,
@@ -482,7 +490,6 @@ const styles = StyleSheet.create({
                   paddingVertical: 12, paddingHorizontal: SPACING.md,
                   alignItems:'center', justifyContent:'center' },
   saveBtn:      { borderRadius: RADIUS.md, paddingVertical: 14, alignItems:'center' },
-
   editCard:     { backgroundColor: COLORS.surface, borderRadius: RADIUS.lg,
                   borderWidth:1, borderColor: COLORS.purple+'40',
                   padding: SPACING.md, marginBottom: SPACING.md },
@@ -493,24 +500,20 @@ const styles = StyleSheet.create({
   editInput:    { backgroundColor: COLORS.surfaceHigh, borderRadius: RADIUS.md,
                   borderWidth:1, borderColor: COLORS.border, color: COLORS.text,
                   padding: SPACING.md, fontSize: 15, marginBottom: SPACING.sm },
-
   catChip:      { flexDirection:'row', alignItems:'center', gap: SPACING.xs,
                   borderRadius: RADIUS.full, borderWidth:1, paddingHorizontal: SPACING.md,
                   paddingVertical: SPACING.xs, marginRight: SPACING.sm },
   catChipLabel: { fontSize: 12, fontWeight: '600' },
-
   payRow:       { flexDirection:'row', gap: SPACING.sm, flexWrap:'wrap' },
   payChip:      { flexDirection:'row', alignItems:'center', gap: 4,
                   borderRadius: RADIUS.md, borderWidth:1, paddingHorizontal: SPACING.md,
                   paddingVertical: SPACING.sm },
   payLabel:     { fontSize: 12, fontWeight: '600' },
-
   manualBox:    { backgroundColor: COLORS.surface, borderRadius: RADIUS.lg,
                   borderWidth:1, borderColor: COLORS.border,
                   padding: SPACING.md, marginBottom: SPACING.xl },
   manualInputRow:{ flexDirection:'row', gap: SPACING.sm },
   manualHint:   { fontSize: 11, color: COLORS.textMuted, marginTop: 4 },
-
   quickGrid:    { flexDirection:'row', flexWrap:'wrap', gap: SPACING.sm },
   quickBtn:     { width: '30%', alignItems:'center', borderRadius: RADIUS.md,
                   borderWidth:1, paddingVertical: SPACING.md,
